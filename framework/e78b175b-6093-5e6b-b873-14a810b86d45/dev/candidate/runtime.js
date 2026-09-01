@@ -1321,14 +1321,31 @@ function activateBundle(bundle, acquisition, contract, wasmLoad = null) {
 }
 
 function validatePlatformReceipt(platform) {
+  const mode = platform?.migration?.mode;
+  const prepared = mode === 'PLATFORM_RELEASE_PREPARED';
+  const active = mode === 'PLATFORM_RELEASE_ACTIVE';
+  const embedded = mode === 'EMBEDDED_WFM_FLOOR_ACTIVE';
+  const validHealthPhase = (prepared &&
+    platform.migration.platformCachePrepared === true &&
+    platform.migration.platformCacheActivated === false &&
+    platform.migration.runtimeHealthRequired === true &&
+    platform?.distribution?.status === 'ACTIVE_ONLINE') ||
+    (active && platform.migration.platformCachePrepared === false &&
+      platform.migration.runtimeHealthRequired === false) ||
+    (embedded && platform.migration.platformCachePrepared === false &&
+      platform.migration.platformCacheActivated === false &&
+      platform.migration.runtimeHealthRequired === false &&
+      platform.migration.embeddedFloorGeneration === platform.distribution.websiteGeneration &&
+      platform?.distribution?.status === 'EMBEDDED_WFM_FLOOR_ACTIVE');
   if (platform?.migration?.schemaVersion !==
       'asrelease-next-website-distribution-migration/v1' ||
-      platform.migration.mode !== 'PLATFORM_RELEASE_ACTIVE' ||
+      !validHealthPhase ||
       platform.migration.presentationRemountRequired !== false ||
       platform?.distribution?.schemaVersion !==
       'asrelease-next-website-distribution-receipt/v1' ||
       platform.distribution.integrityStatus !== 'verified' ||
-      !['ACTIVE_ONLINE', 'ACTIVE_CACHE', 'ACTIVE_CACHE_REFRESH_REJECTED', 'UNCHANGED']
+      !['ACTIVE_ONLINE', 'ACTIVE_CACHE', 'ACTIVE_CACHE_REFRESH_REJECTED', 'UNCHANGED',
+        'EMBEDDED_WFM_FLOOR_ACTIVE']
         .includes(platform.distribution.status)) {
     throw new Error('profile_runtime_platform_release_rejected');
   }
